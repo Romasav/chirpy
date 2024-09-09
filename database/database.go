@@ -10,14 +10,16 @@ import (
 )
 
 type DBStructure struct {
-	Chirps map[int]Chirp `json:"chirps"`
-	Users  map[int]User  `json:"users"`
+	Chirps        map[int]Chirp        `json:"chirps"`
+	Users         map[int]User         `json:"users"`
+	RefreshTokens map[int]RefreshToken `json:"refresh_tokens"`
 }
 
-func NewDBStructure(chirps map[int]Chirp, users map[int]User) (*DBStructure, error) {
+func NewDBStructure(chirps map[int]Chirp, users map[int]User, refreshTokens map[int]RefreshToken) (*DBStructure, error) {
 	newDBStructure := DBStructure{
-		Chirps: chirps,
-		Users:  users,
+		Chirps:        chirps,
+		Users:         users,
+		RefreshTokens: refreshTokens,
 	}
 	return &newDBStructure, nil
 }
@@ -41,7 +43,7 @@ func NewDB(path string) (*DB, error) {
 	return &db, nil
 }
 
-func (db *DB) CreateUser(email string) (User, error) {
+func (db *DB) CreateUser(email, password string) (User, error) {
 	dbStructure, err := db.loadDB()
 	if err != nil {
 		return User{}, err
@@ -49,9 +51,13 @@ func (db *DB) CreateUser(email string) (User, error) {
 
 	newUserId := len(dbStructure.Users) + 1
 
-	newUser, err := NewUser(newUserId, email)
+	newUser, err := NewUser(newUserId, email, password)
 	if err != nil {
 		return User{}, err
+	}
+
+	if _, exists := dbStructure.Users[newUserId]; exists {
+		return User{}, errors.New("the user with this email already exists")
 	}
 	dbStructure.Users[newUserId] = *newUser
 	err = db.writeDB(dbStructure)
@@ -60,6 +66,48 @@ func (db *DB) CreateUser(email string) (User, error) {
 	}
 
 	return *newUser, nil
+}
+
+func (db *DB) GetUserByEmail(email string) (User, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	users := dbStructure.Users
+
+	for _, user := range users {
+		if user.Email == email {
+			return user, nil
+		}
+	}
+
+	errorMessage := fmt.Sprintf("the user with email = %v dosent exists", email)
+	return User{}, errors.New(errorMessage)
+}
+
+func (db *DB) UpdateUser(updatedUser User) error {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return err
+	}
+
+	users := dbStructure.Users
+
+	_, exists := users[updatedUser.ID]
+	if !exists {
+		errorMessage := fmt.Sprintf("the user with id = %v dosent exists", updatedUser.ID)
+		return errors.New(errorMessage)
+	}
+
+	users[updatedUser.ID] = updatedUser
+
+	err = db.writeDB(dbStructure)
+	if err != nil {
+		return nil
+	}
+
+	return nil
 }
 
 func (db *DB) CreateChirp(body string) (Chirp, error) {
@@ -121,10 +169,78 @@ func (db *DB) GetChirpByID(chirpID int) (Chirp, error) {
 	return chirp, nil
 }
 
+func (db *DB) CreateRefreshToken(id int) (RefreshToken, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return RefreshToken{}, err
+	}
+
+	refreshToken, err := NewRefreshToken(id)
+	if err != nil {
+		return RefreshToken{}, err
+	}
+
+	dbStructure.RefreshTokens[id] = *refreshToken
+
+	err = db.writeDB(dbStructure)
+	if err != nil {
+		return RefreshToken{}, err
+	}
+
+	return *refreshToken, nil
+}
+
+func (db *DB) GetRefreshTokenInfo(refreshToken string) (RefreshToken, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return RefreshToken{}, err
+	}
+
+	refreshTokens := dbStructure.RefreshTokens
+
+	for _, storedRefToken := range refreshTokens {
+		if storedRefToken.Token == refreshToken {
+			return storedRefToken, nil
+		}
+	}
+	errorMessage := fmt.Sprintf("refresh token = %v was not found", refreshToken)
+	return RefreshToken{}, errors.New(errorMessage)
+}
+
+func (db *DB) DeleteRefreshToken(refreshToken string) error {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return err
+	}
+
+	refreshTokens := dbStructure.RefreshTokens
+
+	keyToDelete := -1
+	for key, storedRefToken := range refreshTokens {
+		if storedRefToken.Token == refreshToken {
+			keyToDelete = key
+		}
+	}
+
+	if keyToDelete == -1 {
+		errorMessage := fmt.Sprintf("refresh token = %v was not found", refreshToken)
+		return errors.New(errorMessage)
+	}
+
+	delete(refreshTokens, keyToDelete)
+
+	err = db.writeDB(dbStructure)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (db *DB) ensureDB() error {
 	_, err := os.ReadFile(db.path)
 	if errors.Is(err, os.ErrNotExist) {
-		initialData, err := NewDBStructure(make(map[int]Chirp), make(map[int]User))
+		initialData, err := NewDBStructure(make(map[int]Chirp), make(map[int]User), make(map[int]RefreshToken))
 		if err != nil {
 			return err
 		}

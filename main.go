@@ -8,9 +8,12 @@ import (
 	"os"
 
 	"github.com/Romasav/chirpy/database"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	godotenv.Load()
+
 	dbg := flag.Bool("debug", false, "Enable debug mode")
 	flag.Parse()
 	if *dbg {
@@ -41,7 +44,11 @@ func main() {
 	serverMux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) { handlerPostChirp(w, r, db) })
 	serverMux.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, r *http.Request) { handlerGetChirp(w, db) })
 	serverMux.HandleFunc("GET /api/chirps/{chirpID}", func(w http.ResponseWriter, r *http.Request) { handlerGetChirpByID(w, r, db) })
-	serverMux.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) { handlePostUser(w, r, db) })
+	serverMux.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) { handlerPostUser(w, r, db) })
+	serverMux.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) { handlerLoginUser(w, r, db) })
+	serverMux.HandleFunc("PUT /api/users", func(w http.ResponseWriter, r *http.Request) { handlerUpdateUser(w, r, db) })
+	serverMux.HandleFunc("POST /api/refresh", func(w http.ResponseWriter, r *http.Request) { handlerRefreshToken(w, r, db) })
+	serverMux.HandleFunc("POST /api/revoke", func(w http.ResponseWriter, r *http.Request) { handlerRevokeToken(w, r, db) })
 
 	server := http.Server{
 		Addr:    ":" + port,

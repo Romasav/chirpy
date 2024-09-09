@@ -4,9 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/Romasav/chirpy/database"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func handlerReadiness(w http.ResponseWriter, r *http.Request) {
@@ -64,24 +68,221 @@ func handlerPostChirp(w http.ResponseWriter, r *http.Request, db *database.DB) {
 	respondWithJSON(w, chirp, http.StatusCreated)
 }
 
-type userRequest struct {
-	Email string `json:"email"`
-}
-
-func handlePostUser(w http.ResponseWriter, r *http.Request, db *database.DB) {
+func handlerPostUser(w http.ResponseWriter, r *http.Request, db *database.DB) {
 	decoder := json.NewDecoder(r.Body)
-	request := userRequest{}
+	request := struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}{}
 	err := decoder.Decode(&request)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
-	user, err := db.CreateUser(request.Email)
+	user, err := db.CreateUser(request.Email, request.Password)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Couldnt create user")
 		return
 	}
 
-	respondWithJSON(w, user, http.StatusCreated)
+	userRespond := struct {
+		ID    int    `json:"id"`
+		Email string `json:"email"`
+	}{
+		ID:    user.ID,
+		Email: user.Email,
+	}
+
+	respondWithJSON(w, userRespond, http.StatusCreated)
+}
+
+func handlerLoginUser(w http.ResponseWriter, r *http.Request, db *database.DB) {
+	decoder := json.NewDecoder(r.Body)
+	request := struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}{}
+	err := decoder.Decode(&request)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	user, err := db.GetUserByEmail(request.Email)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "The user was not found")
+		return
+	}
+
+	err = user.ComparePassword(request.Password)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Incorrect Password")
+		return
+	}
+
+	accessToken, err := generateJWT(user.ID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error getting a token")
+		return
+	}
+
+	refreshToken, err := db.CreateRefreshToken(user.ID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error creating a refresh token")
+		return
+	}
+
+	userRespond := struct {
+		ID           int    `json:"id"`
+		Email        string `json:"email"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
+	}{
+		ID:           user.ID,
+		Email:        user.Email,
+		Token:        accessToken,
+		RefreshToken: refreshToken.Token,
+	}
+
+	respondWithJSON(w, userRespond, http.StatusOK)
+}
+
+func generateJWT(userID int) (string, error) {
+	expiresInSeconds := 3600
+	claims := &jwt.RegisteredClaims{
+		Issuer:    "chirpy",
+		Subject:   fmt.Sprintf("%d", userID),
+		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(time.Duration(expiresInSeconds) * time.Second)),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	tokenString, err := token.SignedString([]byte(jwtSecret))
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+func handlerUpdateUser(w http.ResponseWriter, r *http.Request, db *database.DB) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		respondWithError(w, http.StatusUnauthorized, "Authorization header is required")
+		return
+	}
+
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+	token, err := jwt.ParseWithClaims(tokenStr, &jwt.RegisteredClaims{}, func(t *jwt.Token) (interface{}, error) {
+		jwtSecret := os.Getenv("JWT_SECRET")
+		return []byte(jwtSecret), nil
+	})
+	if err != nil || !token.Valid {
+		respondWithError(w, http.StatusUnauthorized, "Invalid or expired token")
+		return
+	}
+
+	claims := token.Claims
+	userIdString, err := claims.GetSubject()
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token claims")
+		return
+	}
+
+	userId, err := strconv.Atoi(userIdString)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldnt get userId")
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	request := struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}{}
+	err = decoder.Decode(&request)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	updatedUser, err := database.NewUser(userId, request.Email, request.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldnt create updated user")
+		return
+	}
+
+	err = db.UpdateUser(*updatedUser)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to update user")
+		return
+	}
+
+	userRespond := struct {
+		ID    int    `json:"id"`
+		Email string `json:"email"`
+	}{
+		ID:    updatedUser.ID,
+		Email: updatedUser.Email,
+	}
+
+	respondWithJSON(w, userRespond, http.StatusOK)
+}
+
+func handlerRefreshToken(w http.ResponseWriter, r *http.Request, db *database.DB) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		respondWithError(w, http.StatusUnauthorized, "Authorization header is required")
+		return
+	}
+
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+	refreshToken, err := db.GetRefreshTokenInfo(tokenStr)
+	if err != nil || refreshToken.ExpiresAt.Before(time.Now()) {
+		respondWithError(w, http.StatusUnauthorized, "The refresh token is invalid")
+		return
+	}
+
+	token, err := generateJWT(refreshToken.UserID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error getting a token")
+		return
+	}
+
+	respond := struct {
+		Token string `json:"token"`
+	}{
+		Token: token,
+	}
+
+	respondWithJSON(w, respond, http.StatusOK)
+}
+
+func handlerRevokeToken(w http.ResponseWriter, r *http.Request, db *database.DB) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		respondWithError(w, http.StatusUnauthorized, "Authorization header is required")
+		return
+	}
+
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+	refreshToken, err := db.GetRefreshTokenInfo(tokenStr)
+	if err != nil || refreshToken.ExpiresAt.Before(time.Now()) {
+		respondWithError(w, http.StatusUnauthorized, "The refresh token is invalid")
+		return
+	}
+
+	err = db.DeleteRefreshToken(refreshToken.Token)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Failed to delete refresh token")
+		return
+	}
+
+	respondWithJSON(w, struct{}{}, http.StatusNoContent)
 }
