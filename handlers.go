@@ -46,26 +46,113 @@ func handlerGetChirpByID(w http.ResponseWriter, r *http.Request, db *database.DB
 	respondWithJSON(w, chirp, http.StatusOK)
 }
 
-type chirpRequest struct {
-	Body string `json:"body"`
-}
-
 func handlerPostChirp(w http.ResponseWriter, r *http.Request, db *database.DB) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		respondWithError(w, http.StatusUnauthorized, "Authorization header is required")
+		return
+	}
+
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+	token, err := jwt.ParseWithClaims(tokenStr, &jwt.RegisteredClaims{}, func(t *jwt.Token) (interface{}, error) {
+		jwtSecret := os.Getenv("JWT_SECRET")
+		return []byte(jwtSecret), nil
+	})
+	if err != nil || !token.Valid {
+		respondWithError(w, http.StatusUnauthorized, "Invalid or expired token")
+		return
+	}
+
+	claims := token.Claims
+	userIdString, err := claims.GetSubject()
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token claims")
+		return
+	}
+
+	userId, err := strconv.Atoi(userIdString)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldnt get userId")
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
-	request := chirpRequest{}
-	err := decoder.Decode(&request)
+	request := struct {
+		Body string `json:"body"`
+	}{}
+	err = decoder.Decode(&request)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
-	chirp, err := db.CreateChirp(request.Body)
+	chirp, err := db.CreateChirp(request.Body, userId)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Could not create chirp")
 		return
 	}
 
 	respondWithJSON(w, chirp, http.StatusCreated)
+}
+
+func handlerDeleteChirp(w http.ResponseWriter, r *http.Request, db *database.DB) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		respondWithError(w, http.StatusUnauthorized, "Authorization header is required")
+		return
+	}
+
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+	token, err := jwt.ParseWithClaims(tokenStr, &jwt.RegisteredClaims{}, func(t *jwt.Token) (interface{}, error) {
+		jwtSecret := os.Getenv("JWT_SECRET")
+		return []byte(jwtSecret), nil
+	})
+	if err != nil || !token.Valid {
+		respondWithError(w, http.StatusUnauthorized, "Invalid or expired token")
+		return
+	}
+
+	claims := token.Claims
+	userIdString, err := claims.GetSubject()
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token claims")
+		return
+	}
+
+	userId, err := strconv.Atoi(userIdString)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldnt get userId")
+		return
+	}
+
+	chirpIDStr := r.PathValue("chirpID")
+	chirpID, err := strconv.Atoi(chirpIDStr)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to convert chirpIDStr to int")
+		return
+	}
+
+	chirp, err := db.GetChirpByID(chirpID)
+	if err != nil {
+		errorMessage := fmt.Sprintf("The chirp with id = %v was not found", chirpID)
+		respondWithError(w, http.StatusNotFound, errorMessage)
+		return
+	}
+
+	if chirp.AuthorID != userId {
+		respondWithError(w, http.StatusForbidden, "you cant delete chirps that were created by someone else")
+		return
+	}
+
+	err = db.DeleteChirpByID(chirpID)
+	if err != nil {
+		respondWithError(w, http.StatusForbidden, "error deleting a chirp")
+		return
+	}
+
+	respondWithJSON(w, struct{}{}, http.StatusNoContent)
 }
 
 func handlerPostUser(w http.ResponseWriter, r *http.Request, db *database.DB) {

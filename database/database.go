@@ -110,23 +110,29 @@ func (db *DB) UpdateUser(updatedUser User) error {
 	return nil
 }
 
-func (db *DB) CreateChirp(body string) (Chirp, error) {
+func (db *DB) CreateChirp(body string, authorID int) (Chirp, error) {
 	dbStructure, err := db.loadDB()
 	if err != nil {
 		return Chirp{}, err
 	}
 
-	newId := len(dbStructure.Chirps) + 1
+	newID := 0
+	for chirpID := range dbStructure.Chirps {
+		if chirpID > newID {
+			newID = chirpID
+		}
+	}
+	newID++
 
-	chirp, err := NewChirp(body, newId)
+	chirp, err := NewChirp(body, newID, authorID)
 	if err != nil {
 		return Chirp{}, err
 	}
 
-	dbStructure.Chirps[newId] = *chirp
+	dbStructure.Chirps[newID] = *chirp
 	err = db.writeDB(dbStructure)
 	if err != nil {
-		return Chirp{}, nil
+		return Chirp{}, err
 	}
 
 	return *chirp, nil
@@ -167,6 +173,22 @@ func (db *DB) GetChirpByID(chirpID int) (Chirp, error) {
 	}
 
 	return chirp, nil
+}
+
+func (db *DB) DeleteChirpByID(chirpID int) error {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return err
+	}
+
+	delete(dbStructure.Chirps, chirpID)
+
+	err = db.writeDB(dbStructure)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (db *DB) CreateRefreshToken(id int) (RefreshToken, error) {

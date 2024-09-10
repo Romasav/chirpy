@@ -22,7 +22,7 @@ func main() {
 		if err != nil && !os.IsNotExist(err) {
 			fmt.Printf("Failed to delete database: %v\n", err)
 		}
-
+		fmt.Println("Deletion was successful")
 	}
 
 	const filepathRoot = "."
@@ -44,6 +44,7 @@ func main() {
 	serverMux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) { handlerPostChirp(w, r, db) })
 	serverMux.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, r *http.Request) { handlerGetChirp(w, db) })
 	serverMux.HandleFunc("GET /api/chirps/{chirpID}", func(w http.ResponseWriter, r *http.Request) { handlerGetChirpByID(w, r, db) })
+	serverMux.HandleFunc("DELETE /api/chirps/{chirpID}", func(w http.ResponseWriter, r *http.Request) { handlerDeleteChirp(w, r, db) })
 	serverMux.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) { handlerPostUser(w, r, db) })
 	serverMux.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) { handlerLoginUser(w, r, db) })
 	serverMux.HandleFunc("PUT /api/users", func(w http.ResponseWriter, r *http.Request) { handlerUpdateUser(w, r, db) })

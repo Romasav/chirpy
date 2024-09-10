@@ -8,19 +8,21 @@ import (
 )
 
 type Chirp struct {
-	ID   int    `json:"id"`
-	Body string `json:"body"`
+	ID       int    `json:"id"`
+	Body     string `json:"body"`
+	AuthorID int    `json:"author_id"`
 }
 
-func NewChirp(body string, id int) (*Chirp, error) {
+func NewChirp(body string, id int, authorID int) (*Chirp, error) {
 	validatedBody, err := validateChirp(body)
 	if err != nil {
 		return nil, err
 	}
 
 	newChirp := Chirp{
-		ID:   id,
-		Body: validatedBody,
+		ID:       id,
+		Body:     validatedBody,
+		AuthorID: authorID,
 	}
 
 	return &newChirp, nil
