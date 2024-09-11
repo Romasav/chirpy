@@ -110,6 +110,29 @@ func (db *DB) UpdateUser(updatedUser User) error {
 	return nil
 }
 
+func (db *DB) UpgradeToChirpyRed(userID int) (User, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	user, exists := dbStructure.Users[userID]
+	if !exists {
+		return User{}, errors.New("the user was nto found")
+	}
+
+	user.IsChirpyRed = true
+	dbStructure.Users[userID] = user
+
+	err = db.writeDB(dbStructure)
+	if err != nil {
+		return User{}, nil
+	}
+
+	return user, nil
+
+}
+
 func (db *DB) CreateChirp(body string, authorID int) (Chirp, error) {
 	dbStructure, err := db.loadDB()
 	if err != nil {

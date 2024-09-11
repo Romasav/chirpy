@@ -50,6 +50,7 @@ func main() {
 	serverMux.HandleFunc("PUT /api/users", func(w http.ResponseWriter, r *http.Request) { handlerUpdateUser(w, r, db) })
 	serverMux.HandleFunc("POST /api/refresh", func(w http.ResponseWriter, r *http.Request) { handlerRefreshToken(w, r, db) })
 	serverMux.HandleFunc("POST /api/revoke", func(w http.ResponseWriter, r *http.Request) { handlerRevokeToken(w, r, db) })
+	serverMux.HandleFunc("POST /api/polka/webhooks", func(w http.ResponseWriter, r *http.Request) { handlerWebhooks(w, r, db) })
 
 	server := http.Server{
 		Addr:    ":" + port,

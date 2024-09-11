@@ -174,11 +174,13 @@ func handlerPostUser(w http.ResponseWriter, r *http.Request, db *database.DB) {
 	}
 
 	userRespond := struct {
-		ID    int    `json:"id"`
-		Email string `json:"email"`
+		ID          int    `json:"id"`
+		Email       string `json:"email"`
+		IsChirpyRed bool   `json:"is_chirpy_red"`
 	}{
-		ID:    user.ID,
-		Email: user.Email,
+		ID:          user.ID,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed,
 	}
 
 	respondWithJSON(w, userRespond, http.StatusCreated)
@@ -223,11 +225,13 @@ func handlerLoginUser(w http.ResponseWriter, r *http.Request, db *database.DB) {
 	userRespond := struct {
 		ID           int    `json:"id"`
 		Email        string `json:"email"`
+		IsChirpyRed  bool   `json:"is_chirpy_red"`
 		Token        string `json:"token"`
 		RefreshToken string `json:"refresh_token"`
 	}{
 		ID:           user.ID,
 		Email:        user.Email,
+		IsChirpyRed:  user.IsChirpyRed,
 		Token:        accessToken,
 		RefreshToken: refreshToken.Token,
 	}
@@ -310,11 +314,13 @@ func handlerUpdateUser(w http.ResponseWriter, r *http.Request, db *database.DB) 
 	}
 
 	userRespond := struct {
-		ID    int    `json:"id"`
-		Email string `json:"email"`
+		ID          int    `json:"id"`
+		Email       string `json:"email"`
+		IsChirpyRed bool   `json:"is_chirpy_red"`
 	}{
-		ID:    updatedUser.ID,
-		Email: updatedUser.Email,
+		ID:          updatedUser.ID,
+		Email:       updatedUser.Email,
+		IsChirpyRed: updatedUser.IsChirpyRed,
 	}
 
 	respondWithJSON(w, userRespond, http.StatusOK)
@@ -369,6 +375,46 @@ func handlerRevokeToken(w http.ResponseWriter, r *http.Request, db *database.DB)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Failed to delete refresh token")
 		return
+	}
+
+	respondWithJSON(w, struct{}{}, http.StatusNoContent)
+}
+
+func handlerWebhooks(w http.ResponseWriter, r *http.Request, db *database.DB) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		respondWithError(w, http.StatusUnauthorized, "Authorization header is required")
+		return
+	}
+
+	apiKey := strings.TrimPrefix(authHeader, "ApiKey ")
+
+	if apiKey != os.Getenv("POLKA_KEY") {
+		respondWithError(w, http.StatusUnauthorized, "Incorrect key")
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	request := struct {
+		Event string `json:"event"`
+		Data  struct {
+			UserID int `json:"user_id"`
+		} `json:"data"`
+	}{}
+	err := decoder.Decode(&request)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	if request.Event != "user.upgraded" {
+		respondWithJSON(w, struct{}{}, http.StatusNoContent)
+		return
+	}
+
+	_, err = db.UpgradeToChirpyRed(request.Data.UserID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "the user was not found")
 	}
 
 	respondWithJSON(w, struct{}{}, http.StatusNoContent)

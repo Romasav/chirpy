@@ -7,9 +7,10 @@ import (
 )
 
 type User struct {
-	ID       int    `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	ID          int    `json:"id"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	IsChirpyRed bool   `json:"is_chirpy_red"`
 }
 
 func NewUser(id int, email, password string) (*User, error) {
@@ -19,9 +20,10 @@ func NewUser(id int, email, password string) (*User, error) {
 	}
 
 	newUser := User{
-		ID:       id,
-		Email:    email,
-		Password: hashedPassword,
+		ID:          id,
+		Email:       email,
+		Password:    hashedPassword,
+		IsChirpyRed: false,
 	}
 	return &newUser, nil
 }
