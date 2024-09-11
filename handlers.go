@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -19,12 +20,43 @@ func handlerReadiness(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(http.StatusText(http.StatusOK)))
 }
 
-func handlerGetChirp(w http.ResponseWriter, db *database.DB) {
+func handlerGetChirp(w http.ResponseWriter, r *http.Request, db *database.DB) {
 	chirps, err := db.GetChirps()
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to load chirps")
 		return
 	}
+
+	authorIDString := r.URL.Query().Get("author_id")
+	if authorIDString != "" {
+		authorID, err := strconv.Atoi(authorIDString)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Couldnt get authorId")
+			return
+		}
+		filteredChirps := []database.Chirp{}
+		for _, chirp := range chirps {
+			if chirp.AuthorID == authorID {
+				filteredChirps = append(filteredChirps, chirp)
+			}
+		}
+		chirps = filteredChirps
+	}
+
+	sortMethod := r.URL.Query().Get("sort")
+	if sortMethod == "" {
+		sortMethod = "asc"
+	}
+	if sortMethod == "asc" {
+		sort.Slice(chirps, func(i, j int) bool {
+			return chirps[i].ID < chirps[j].ID
+		})
+	} else if sortMethod == "desc" {
+		sort.Slice(chirps, func(i, j int) bool {
+			return chirps[i].ID > chirps[j].ID
+		})
+	}
+
 	respondWithJSON(w, chirps, http.StatusOK)
 }
 

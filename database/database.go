@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"sort"
 	"sync"
 )
 
@@ -173,10 +172,6 @@ func (db *DB) GetChirps() ([]Chirp, error) {
 	for _, chirp := range chirpsMap {
 		chirpsSlice = append(chirpsSlice, chirp)
 	}
-
-	sort.Slice(chirpsSlice, func(i, j int) bool {
-		return chirpsSlice[i].ID < chirpsSlice[j].ID
-	})
 
 	return chirpsSlice, nil
 }

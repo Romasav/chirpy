@@ -42,7 +42,7 @@ func main() {
 	serverMux.HandleFunc("/api/reset", apiConfig.handlerReset)
 	serverMux.HandleFunc("GET /admin/metrics", apiConfig.handlerAdminMetrics)
 	serverMux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) { handlerPostChirp(w, r, db) })
-	serverMux.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, r *http.Request) { handlerGetChirp(w, db) })
+	serverMux.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, r *http.Request) { handlerGetChirp(w, r, db) })
 	serverMux.HandleFunc("GET /api/chirps/{chirpID}", func(w http.ResponseWriter, r *http.Request) { handlerGetChirpByID(w, r, db) })
 	serverMux.HandleFunc("DELETE /api/chirps/{chirpID}", func(w http.ResponseWriter, r *http.Request) { handlerDeleteChirp(w, r, db) })
 	serverMux.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) { handlerPostUser(w, r, db) })
