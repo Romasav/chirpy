@@ -14,11 +14,16 @@ import (
 func main() {
 	godotenv.Load()
 
+	dbPath := os.Getenv("CHIRPY_DB_PATH")
+	if dbPath == "" {
+		dbPath = "database.json"
+	}
+
 	dbg := flag.Bool("debug", false, "Enable debug mode")
 	flag.Parse()
 	if *dbg {
 		fmt.Println("Debug mode enabled: Deleting database...")
-		err := os.Remove("database.json")
+		err := os.Remove(dbPath)
 		if err != nil && !os.IsNotExist(err) {
 			fmt.Printf("Failed to delete database: %v\n", err)
 		}
@@ -28,7 +33,8 @@ func main() {
 	const filepathRoot = "."
 	const port = "8080"
 	apiConfig := apiConfig{}
-	db, err := database.NewDB("database.json")
+
+	db, err := database.NewDB(dbPath)
 	if err != nil {
 		log.Fatal("Could not create new database")
 	}

@@ -59,6 +59,46 @@ Chirpy is a simple microblogging platform written in Go. Users can register, log
 
    The server will start on port `8080` by default.
 
+### Running in Docker
+
+If you'd like to run **Chirpy** in Docker, you'll need to build the Go binary for Linux. Follow these steps:
+
+1. **Build for Linux:**
+
+   Before creating your Docker image, you must compile the Go binary for Linux. You can use the `GOOS` and `GOARCH` environment variables to specify the OS and architecture.
+
+   ```bash
+   GOOS=linux GOARCH=amd64 go build -o chirpy
+   ```
+
+2. **Build the Docker Image:**
+
+   After you've compiled the binary, you can use the provided `Dockerfile` to build the image.
+
+   ```bash
+   docker build -t chirpy .
+   ```
+
+3. **Run the Docker Container:**
+
+   Once the image is built, you can run the application inside a Docker container:
+
+   ```bash
+   docker run -p 8080:8080 chirpy
+   ```
+
+4. **Keeping Data Persistent Between Containers:**
+
+   By default, the `database.json` file (used to store application data) will be created inside the container. However, this file will be lost when the container is removed. If you want to keep your data persistent between different containers, you can mount a Docker volume to store the `database.json` file outside the container.
+
+   Use the following command to ensure your data is persisted:
+
+   ```bash
+   docker run -v chirpy-vol:/app/data -e CHIRPY_DB_PATH=/app/data/database.json -p 8080:8080 chirpy
+   ```
+
+   In this case, Docker will create a volume called `chirpy-vol` to store the `database.json` file, and this volume will persist even if the container is removed. The file won't be saved in the current directory (`$(pwd)`), but rather in a Docker-managed location that can be reused by other containers.
+
 ## Usage
 
 ### Local Deployment
