@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -292,6 +293,11 @@ func (db *DB) ensureDB() error {
 func (db *DB) writeDB(dbStructure DBStructure) error {
 	db.mux.Lock()
 	defer db.mux.Unlock()
+
+	err := os.MkdirAll(filepath.Dir(db.path), os.ModePerm)
+	if err != nil {
+		return err
+	}
 
 	data, err := json.Marshal(dbStructure)
 	if err != nil {

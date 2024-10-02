@@ -1,5 +1,7 @@
 FROM debian:stable-slim
 
-COPY chirpy /bin/goserver
+COPY chirpy /bin/chirpy
 
-CMD ["/bin/goserver"]
+ENV CHIRPY_DB_PATH=/app/data/database.json
+
+CMD ["/bin/chirpy"]

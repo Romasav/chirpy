@@ -61,43 +61,35 @@ Chirpy is a simple microblogging platform written in Go. Users can register, log
 
 ### Running in Docker
 
-If you'd like to run **Chirpy** in Docker, you'll need to build the Go binary for Linux. Follow these steps:
+If you'd like to run **Chirpy** in Docker, follow these steps:
 
-1. **Build for Linux:**
+1. **Pull the Docker Image:**
 
-   Before creating your Docker image, you must compile the Go binary for Linux. You can use the `GOOS` and `GOARCH` environment variables to specify the OS and architecture.
-
-   ```bash
-   GOOS=linux GOARCH=amd64 go build -o chirpy
-   ```
-
-2. **Build the Docker Image:**
-
-   After you've compiled the binary, you can use the provided `Dockerfile` to build the image.
+   If you've published the image to Docker Hub, users can pull it directly from there instead of building it locally.
 
    ```bash
-   docker build -t chirpy .
+   docker pull kavuunnn/chirpy:latest
    ```
 
-3. **Run the Docker Container:**
+2. **Run the Docker Container:**
 
-   Once the image is built, you can run the application inside a Docker container:
+   Once the image is pulled, you can run the application inside a Docker container:
 
    ```bash
-   docker run -p 8080:8080 chirpy
+   docker run -p 8080:8080 kavuunnn/chirpy
    ```
 
-4. **Keeping Data Persistent Between Containers:**
+3. **Keeping Data Persistent Between Containers:**
 
    By default, the `database.json` file (used to store application data) will be created inside the container. However, this file will be lost when the container is removed. If you want to keep your data persistent between different containers, you can mount a Docker volume to store the `database.json` file outside the container.
 
    Use the following command to ensure your data is persisted:
 
    ```bash
-   docker run -v chirpy-vol:/app/data -e CHIRPY_DB_PATH=/app/data/database.json -p 8080:8080 chirpy
+   docker run -v chirpy-vol:/app/data -p 8080:8080 kavuunnn/chirpy
    ```
 
-   In this case, Docker will create a volume called `chirpy-vol` to store the `database.json` file, and this volume will persist even if the container is removed. The file won't be saved in the current directory (`$(pwd)`), but rather in a Docker-managed location that can be reused by other containers.
+   In this case, Docker will create a volume called `chirpy-vol` to store the `database.json` file, and this volume will persist even if the container is removed. The file will be stored in a Docker-managed location that can be reused by other containers.
 
 ## Usage
 
