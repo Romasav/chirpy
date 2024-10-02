@@ -65,8 +65,6 @@ If you'd like to run **Chirpy** in Docker, follow these steps:
 
 1. **Pull the Docker Image:**
 
-   If you've published the image to Docker Hub, users can pull it directly from there instead of building it locally.
-
    ```bash
    docker pull kavuunnn/chirpy:latest
    ```
